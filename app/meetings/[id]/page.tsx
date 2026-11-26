@@ -2,13 +2,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import MeetingDetail from '@/components/MeetingDetail';
 import PrintButton from '@/components/PrintButton';
-import { fetchMeeting } from '@/lib/api';
+import { getMeetingById } from '@/lib/meetings-db';
 
 export default async function MeetingPage({ params }: PageProps<'/meetings/[id]'>) {
   const { id } = await params; // params is a Promise in Next 15+
-  const meeting = await fetchMeeting(id); // GET /api/meetings/[id]
+  // Only digits allowed, same as the API route ('abc', '1.5', '1abc' → 404).
+  const meeting = /^\d+$/.test(id) ? await getMeetingById(Number(id)) : undefined;
 
-  // The API returned 400 or 404 → show the not-found page.
   if (!meeting) notFound();
 
   return (

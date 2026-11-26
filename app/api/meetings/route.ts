@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { getMeetings } from '@/lib/meetings-db';
+import { isValidISODate } from '@/lib/dates';
 import type { SacramentMeeting } from '@/lib/types';
 
 // GET /api/meetings              → all meetings, newest first
@@ -7,9 +8,9 @@ import type { SacramentMeeting } from '@/lib/types';
 export async function GET(request: NextRequest) {
   const date = request.nextUrl.searchParams.get('date');
 
-  // Reject dates that aren't in YYYY-MM-DD format instead of silently
-  // returning an empty list.
-  if (date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  // Reject dates that aren't real YYYY-MM-DD dates instead of silently
+  // returning an empty list (or letting Postgres fail on '2026-13-45').
+  if (date !== null && !isValidISODate(date)) {
     return Response.json(
       { error: 'date must be in YYYY-MM-DD format' },
       { status: 400 },

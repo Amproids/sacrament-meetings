@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { connection } from 'next/server';
-import { fetchMeetings } from '@/lib/api';
+import { getMeetings } from '@/lib/meetings-db';
 import { formatMeetingDate, mostRecentSundayISO } from '@/lib/dates';
 
 export default async function CurrentMeetingPage() {
@@ -9,7 +9,7 @@ export default async function CurrentMeetingPage() {
   await connection();
 
   const sunday = mostRecentSundayISO();
-  const [meeting] = await fetchMeetings(sunday); // GET /api/meetings?date=...
+  const [meeting] = await getMeetings(sunday);
 
   if (meeting) {
     redirect(`/meetings/${meeting.id}`);

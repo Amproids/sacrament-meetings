@@ -1,13 +1,16 @@
 import type { Metadata } from 'next';
+import { connection } from 'next/server';
 import MeetingCard from '@/components/MeetingCard';
-import { fetchMeetings } from '@/lib/api';
+import { getMeetings } from '@/lib/meetings-db';
 
 export const metadata: Metadata = {
   title: 'Meetings',
 };
 
 export default async function MeetingsPage() {
-  const meetings = await fetchMeetings(); // GET /api/meetings
+  // Read the database on each request, not once at build time.
+  await connection();
+  const meetings = await getMeetings();
 
   return (
     <>

@@ -27,6 +27,14 @@ export function mostRecentSundayISO(now: Date = new Date()): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** True for a real calendar date in 'YYYY-MM-DD' form (rejects '2026-02-30'). */
+export function isValidISODate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.toISOString().slice(0, 10) === value;
+}
+
 /** Formats 'YYYY-MM-DD' for display, e.g. 'Sunday, November 8, 2026'. */
 export function formatMeetingDate(iso: string): string {
   const [year, month, day] = iso.split('-').map(Number);
