@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { connection } from 'next/server';
 import DeleteMeetingButton from '@/components/admin/DeleteMeetingButton';
-import { getMeetings } from '@/lib/meetings-db';
+import MeetingSearch from '@/components/MeetingSearch';
+import Pagination, { ResultSummary } from '@/components/Pagination';
+import { parseListParams } from '@/lib/list-params';
+import { searchMeetings } from '@/lib/meetings-db';
 import { formatMeetingDate } from '@/lib/dates';
 import { MEETING_TYPE_LABELS } from '@/lib/labels';
 import { deleteMeeting } from './actions';
@@ -11,10 +13,9 @@ export const metadata: Metadata = {
   title: 'Manage meetings',
 };
 
-export default async function AdminMeetingsPage() {
-  // Read the database on each request, not once at build time.
-  await connection();
-  const meetings = await getMeetings();
+export default async function AdminMeetingsPage({ searchParams }: PageProps<'/admin/meetings'>) {
+  const params = parseListParams(await searchParams);
+  const { meetings, total } = await searchMeetings(params);
 
   return (
     <>
@@ -31,8 +32,15 @@ export default async function AdminMeetingsPage() {
         </Link>
       </div>
 
+      <div className="mt-6 space-y-3">
+        <MeetingSearch basePath="/admin/meetings" params={params} />
+        <ResultSummary params={params} total={total} />
+      </div>
+
       {meetings.length === 0 ? (
-        <p className="mt-8 italic">No meetings have been planned yet.</p>
+        <p className="mt-8 italic">
+          {params.query || total > 0 ? 'No meetings to show.' : 'No meetings have been planned yet.'}
+        </p>
       ) : (
         <div className="mt-8 overflow-x-auto">
           <table className="w-full border border-rule bg-card text-left text-sm">
@@ -77,6 +85,8 @@ export default async function AdminMeetingsPage() {
           </table>
         </div>
       )}
+
+      <Pagination basePath="/admin/meetings" params={params} total={total} />
     </>
   );
 }

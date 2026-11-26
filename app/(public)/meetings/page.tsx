@@ -1,16 +1,21 @@
 import type { Metadata } from 'next';
-import { connection } from 'next/server';
+import Link from 'next/link';
 import MeetingCard from '@/components/MeetingCard';
-import { getMeetings } from '@/lib/meetings-db';
+import MeetingSearch from '@/components/MeetingSearch';
+import Pagination, { ResultSummary } from '@/components/Pagination';
+import { listHref, parseListParams } from '@/lib/list-params';
+import { searchMeetings } from '@/lib/meetings-db';
 
 export const metadata: Metadata = {
   title: 'Meetings',
 };
 
-export default async function MeetingsPage() {
-  // Read the database on each request, not once at build time.
-  await connection();
-  const meetings = await getMeetings();
+// /meetings?q=temple&page=2&limit=6
+export default async function MeetingsPage({ searchParams }: PageProps<'/meetings'>) {
+  // searchParams only exists at request time, so this page reads the
+  // database per request rather than at build time.
+  const params = parseListParams(await searchParams);
+  const { meetings, total } = await searchMeetings(params);
 
   return (
     <>
@@ -19,8 +24,27 @@ export default async function MeetingsPage() {
         Select a Sunday to view or print its program.
       </p>
 
+      <div className="mt-6 space-y-3">
+        <MeetingSearch basePath="/meetings" params={params} />
+        <ResultSummary params={params} total={total} />
+      </div>
+
       {meetings.length === 0 ? (
-        <p className="mt-8 italic">No meetings have been planned yet.</p>
+        <p className="mt-8 italic">
+          {total > 0 ? (
+            <>
+              There are no meetings on this page.{' '}
+              <Link href={listHref('/meetings', { ...params, page: 1 })} className="text-olive underline">
+                Go to the first page
+              </Link>
+              .
+            </>
+          ) : params.query ? (
+            'No meetings match your search.'
+          ) : (
+            'No meetings have been planned yet.'
+          )}
+        </p>
       ) : (
         <ul className="mt-8 grid gap-4 sm:grid-cols-2">
           {meetings.map((meeting) => (
@@ -30,6 +54,8 @@ export default async function MeetingsPage() {
           ))}
         </ul>
       )}
+
+      <Pagination basePath="/meetings" params={params} total={total} />
     </>
   );
 }

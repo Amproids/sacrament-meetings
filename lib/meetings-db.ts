@@ -93,13 +93,79 @@ function toMeeting(row: MeetingRow): SacramentMeeting {
  * returns only the meetings on that date.
  */
 export async function getMeetings(date?: string): Promise<SacramentMeeting[]> {
-  const where = date ? sql`WHERE m.meeting_date = ${date}` : sql``;
   const rows = (await sql`
     ${MEETING_SELECT}
-    ${where}
+    WHERE ${meetingFilters({ date })}
     ORDER BY m.meeting_date DESC, m.id DESC
   `) as MeetingRow[];
   return rows.map(toMeeting);
+}
+
+export interface MeetingSearch {
+  /** Matches hymn titles, speaker names, and talk topics (case-insensitive). */
+  query?: string;
+  /** Only meetings on this 'YYYY-MM-DD' date. */
+  date?: string;
+  /** 1-based page number. */
+  page?: number;
+  /** Meetings per page; null returns every match. */
+  limit?: number | null;
+}
+
+export interface MeetingSearchResult {
+  meetings: SacramentMeeting[];
+  /** Number of meetings matching the search across all pages. */
+  total: number;
+}
+
+/** Escapes ILIKE wildcards so a search for "100%" matches a literal "%". */
+function escapeLike(text: string): string {
+  return text.replace(/[\\%_]/g, '\\$&');
+}
+
+/** The WHERE conditions shared by the list and count queries. */
+function meetingFilters({ query, date }: Pick<MeetingSearch, 'query' | 'date'>) {
+  const byDate = date ? sql`m.meeting_date = ${date}` : sql`TRUE`;
+  if (!query) return byDate;
+
+  const pattern = `%${escapeLike(query)}%`;
+  return sql`${byDate} AND (
+       m.opening_hymn_title   ILIKE ${pattern}
+    OR m.sacrament_hymn_title ILIKE ${pattern}
+    OR m.closing_hymn_title   ILIKE ${pattern}
+    OR EXISTS (
+         SELECT 1 FROM meeting_speakers s
+          WHERE s.meeting_id = m.id
+            AND (s.name ILIKE ${pattern} OR s.topic ILIKE ${pattern})
+       )
+  )`;
+}
+
+/**
+ * Searches and pages through meetings, newest first. Filtering, LIMIT, and
+ * OFFSET all happen in SQL, so only one page of rows leaves the database.
+ */
+export async function searchMeetings({
+  query,
+  date,
+  page = 1,
+  limit = null,
+}: MeetingSearch = {}): Promise<MeetingSearchResult> {
+  const where = meetingFilters({ query, date });
+  const offset = limit === null ? 0 : (page - 1) * limit;
+
+  // The page of rows and the total count, fetched in parallel.
+  const [rows, [{ total }]] = (await Promise.all([
+    sql`
+      ${MEETING_SELECT}
+      WHERE ${where}
+      ORDER BY m.meeting_date DESC, m.id DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `,
+    sql`SELECT count(*)::int AS total FROM meetings m WHERE ${where}`,
+  ])) as [MeetingRow[], { total: number }[]];
+
+  return { meetings: rows.map(toMeeting), total };
 }
 
 /** Returns the meeting with the given id, or undefined if none exists. */
