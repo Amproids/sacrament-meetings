@@ -1,7 +1,5 @@
 import type { Metadata } from 'next';
 import { Gelasio } from 'next/font/google';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
 import { WARD_NAME } from '@/lib/labels';
 import './globals.css';
 
@@ -23,6 +21,9 @@ export const metadata: Metadata = {
   description: `Plan, view, and print sacrament meeting programs for the ${WARD_NAME}.`,
 };
 
+// Root layout: the <html>/<body> shell shared by both route groups.
+// app/(public)/layout.tsx and app/(admin)/layout.tsx add each section's
+// header, <main id="main">, and footer.
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="en" className={`${gelasio.variable} h-full antialiased`}>
@@ -34,11 +35,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         >
           Skip to content
         </a>
-        <Header />
-        <main id="main" className="flex-1">
-          {children}
-        </main>
-        <Footer />
+        {children}
       </body>
     </html>
   );

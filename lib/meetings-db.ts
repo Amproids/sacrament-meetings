@@ -116,3 +116,101 @@ export async function getMeetingById(
   `) as MeetingRow[];
   return rows[0] ? toMeeting(rows[0]) : undefined;
 }
+
+/** Everything needed to create or update a meeting (the id comes from the database). */
+export type MeetingInput = Omit<SacramentMeeting, 'id'>;
+
+/**
+ * Speakers as three parallel text[] parameters. SQL turns them back into
+ * rows with unnest(...) WITH ORDINALITY, which also numbers them (position)
+ * in program order.
+ */
+function speakerRows(meetingId: ReturnType<typeof sql>, speakers: SpeakerItem[]) {
+  return sql`
+    SELECT ${meetingId}, sp.position, sp.name, sp.topic, sp.type
+      FROM unnest(
+             ${speakers.map((s) => s.name)}::text[],
+             ${speakers.map((s) => s.topic)}::text[],
+             ${speakers.map((s) => s.type)}::text[]
+           ) WITH ORDINALITY AS sp (name, topic, type, position)
+  `;
+}
+
+/** Creates a meeting and its speakers. Returns the new meeting's id. */
+export async function createMeeting(input: MeetingInput): Promise<number> {
+  // One statement, so the meeting and its speakers are saved together or
+  // not at all.
+  const rows = (await sql`
+    WITH m AS (
+      INSERT INTO meetings (
+        meeting_date, meeting_type, presiding, conducting, announcements,
+        opening_hymn_number, opening_hymn_title, opening_prayer,
+        ward_business, stake_business,
+        sacrament_hymn_number, sacrament_hymn_title,
+        closing_hymn_number, closing_hymn_title, closing_prayer
+      ) VALUES (
+        ${input.date}, ${input.meetingType}, ${input.presiding}, ${input.conducting},
+        ${input.announcements ?? []}::text[],
+        ${input.openingHymn.number}, ${input.openingHymn.title}, ${input.openingPrayer},
+        ${input.wardBusiness.map((w) => w.description)}::text[], ${input.stakeBusiness},
+        ${input.sacramentHymn?.number ?? null}, ${input.sacramentHymn?.title ?? null},
+        ${input.closingHymn.number}, ${input.closingHymn.title}, ${input.closingPrayer}
+      )
+      RETURNING id
+    ), s AS (
+      INSERT INTO meeting_speakers (meeting_id, position, name, topic, type)
+      ${speakerRows(sql`(SELECT id FROM m)`, input.speakers)}
+    )
+    SELECT id FROM m
+  `) as { id: number }[];
+  return rows[0].id;
+}
+
+/**
+ * Replaces a meeting's fields and speakers. Returns false if no meeting has
+ * that id.
+ */
+export async function updateMeeting(id: number, input: MeetingInput): Promise<boolean> {
+  if (!Number.isInteger(id) || id < 1 || id > MAX_ID) return false;
+
+  // A transaction: either every statement succeeds or none of them do.
+  const [updated] = (await sql.transaction([
+    sql`
+      UPDATE meetings SET
+        meeting_date          = ${input.date},
+        meeting_type          = ${input.meetingType},
+        presiding             = ${input.presiding},
+        conducting            = ${input.conducting},
+        announcements         = ${input.announcements ?? []}::text[],
+        opening_hymn_number   = ${input.openingHymn.number},
+        opening_hymn_title    = ${input.openingHymn.title},
+        opening_prayer        = ${input.openingPrayer},
+        ward_business         = ${input.wardBusiness.map((w) => w.description)}::text[],
+        stake_business        = ${input.stakeBusiness},
+        sacrament_hymn_number = ${input.sacramentHymn?.number ?? null},
+        sacrament_hymn_title  = ${input.sacramentHymn?.title ?? null},
+        closing_hymn_number   = ${input.closingHymn.number},
+        closing_hymn_title    = ${input.closingHymn.title},
+        closing_prayer        = ${input.closingPrayer}
+      WHERE id = ${id}
+      RETURNING id
+    `,
+    sql`DELETE FROM meeting_speakers WHERE meeting_id = ${id}`,
+    // Only re-add speakers if the meeting exists (else the foreign key fails).
+    sql`
+      INSERT INTO meeting_speakers (meeting_id, position, name, topic, type)
+      ${speakerRows(sql`${id}::integer`, input.speakers)}
+      WHERE EXISTS (SELECT 1 FROM meetings WHERE id = ${id})
+    `,
+  ])) as [{ id: number }[], unknown, unknown];
+  return updated.length > 0;
+}
+
+/** Deletes a meeting (its speakers go with it). Returns false if none had that id. */
+export async function deleteMeeting(id: number): Promise<boolean> {
+  if (!Number.isInteger(id) || id < 1 || id > MAX_ID) return false;
+  const rows = (await sql`DELETE FROM meetings WHERE id = ${id} RETURNING id`) as {
+    id: number;
+  }[];
+  return rows.length > 0;
+}

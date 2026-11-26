@@ -14,6 +14,7 @@
   --color-olive: #556029;      /* accent */
   --color-olive-dark: #434b1f; /* accent hover */
   --color-rule: #d9cdb7;       /* thin divider lines */
+  --color-danger: #9b2c1f;     /* form errors, delete buttons */
 
   /* Gelasio (loaded in app/layout.tsx) is metric-compatible with Georgia. */
   --font-serif: var(--font-gelasio), Georgia, "Times New Roman", serif;
