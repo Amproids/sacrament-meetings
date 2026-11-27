@@ -1,26 +1,51 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+  Design tokens. Defining them in @theme makes Tailwind generate utility
+  classes from them, e.g. --color-olive → bg-olive, text-olive, border-olive.
+  Every text/background pair below meets WCAG AA contrast (4.5:1 or better).
+*/
+@theme {
+  --color-paper: #f3ece0;      /* beige page background */
+  --color-card: #fcf9f3;       /* lighter "card stock" surfaces */
+  --color-ink: #33251a;        /* dark brown body text */
+  --color-brown: #6b4a2f;      /* headings, borders */
+  --color-muted: #5e4c3c;      /* secondary text */
+  --color-olive: #556029;      /* accent */
+  --color-olive-dark: #434b1f; /* accent hover */
+  --color-rule: #d9cdb7;       /* thin divider lines */
+  --color-danger: #9b2c1f;     /* form errors, delete buttons */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Gelasio (loaded in app/layout.tsx) is metric-compatible with Georgia. */
+  --font-serif: var(--font-gelasio), Georgia, "Times New Roman", serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-serif);
+}
+
+/* Crisp, business-card look: no rounded corners anywhere. */
+*,
+*::before,
+*::after {
+  border-radius: 0;
+}
+
+/* Visible keyboard focus for links and buttons. */
+:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 3px;
+}
+
+/* Printed programs: plain white paper with sensible margins. */
+@media print {
+  @page {
+    margin: 0.6in;
+  }
+
+  body {
+    background: white;
+  }
 }
